@@ -87,6 +87,52 @@ enum LinkTitle {
         }
         return out + ns.substring(from: last)
     }
+
+    /// Title + description from one request, so a saved link stays recognizable later.
+    struct PageMeta {
+        var title: String?
+        var description: String?
+    }
+
+    /// Same fetch as `fetch`, also returning the page description. `timeout` stays short: the
+    /// description is a nice-to-have, the capture must not wait on slow servers.
+    static func meta(_ url: URL, timeout: TimeInterval = 3, completion: @escaping (PageMeta?) -> Void) {
+        var req = URLRequest(url: url, timeoutInterval: timeout)
+        req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+                     forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: req) { data, resp, _ in
+            var meta: PageMeta?
+            if let data, let http = resp as? HTTPURLResponse, (200..<400).contains(http.statusCode),
+               (http.mimeType ?? "text/html").contains("html") {
+                let head = data.prefix(400_000)
+                let gb = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(
+                    CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))
+                let html = String(data: head, encoding: .utf8) ?? String(data: head, encoding: gb) ?? ""
+                if !html.isEmpty { meta = PageMeta(title: parse(html), description: parseDescription(html)) }
+            }
+            DispatchQueue.main.async { completion(meta) }
+        }.resume()
+    }
+
+    /// og:description first (usually written for humans), then <meta name="description">.
+    static func parseDescription(_ html: String) -> String? {
+        let patterns = [
+            #"<meta[^>]+property=["']og:description["'][^>]*content=["']([^"']+)["']"#,
+            #"<meta[^>]+content=["']([^"']+)["'][^>]*property=["']og:description["']"#,
+            #"<meta[^>]+name=["']description["'][^>]*content=["']([^"']+)["']"#,
+            #"<meta[^>]+content=["']([^"']+)["'][^>]*name=["']description["']"#,
+        ]
+        for p in patterns {
+            guard let re = try? NSRegularExpression(pattern: p, options: [.caseInsensitive]),
+                  let m = re.firstMatch(in: html, range: NSRange(location: 0, length: (html as NSString).length)) else { continue }
+            var t = (html as NSString).substring(with: m.range(at: 1))
+            t = decodeEntities(t).replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespaces)
+            if t.count > 160 { t = String(t.prefix(160)) + "…" }
+            if !t.isEmpty { return t }
+        }
+        return nil
+    }
 }
 
 /// Folder conventions: an Obsidian vault (has .obsidian) or a plain Markdown folder.

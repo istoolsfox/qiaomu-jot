@@ -225,6 +225,20 @@ final class ContentSearch {
     }
 }
 
+/// For 「同网址归并到已存笔记」: the most recently modified candidate that really contains the URL.
+enum MergeTarget {
+    static func pick(paths: [String], url: String, in vault: URL) -> URL? {
+        var best: (file: URL, modified: Date)?
+        for p in paths.prefix(15) where p.hasSuffix(".md") {
+            let file = vault.appendingPathComponent(p)
+            guard let text = try? String(contentsOf: file, encoding: .utf8), text.contains(url) else { continue }
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+            if best == nil || modified > best!.modified { best = (file, modified) }
+        }
+        return best?.file
+    }
+}
+
 enum NoteNaming {
     /// Obsidian-safe file name: no path separators or link-breaking characters.
     static func sanitize(_ title: String) -> String {

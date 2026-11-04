@@ -40,6 +40,7 @@ Press a shortcut to capture thoughts, selections, screenshots and files into you
 | 内容原样保存 | 不自动加列表点、引用符号；复制的是什么就存什么 |
 | 自动带来源 | 网页存成 `[标题](链接)`，PDF 带文件名和页码，电子书带书名和作者，代码带文件名和语言 |
 | 剪贴板与截图 | 没选中内容时，收录剪贴板里的文字、图片、视频、文件，或刚截的屏；同一份只收一次。不想让剪贴板进日记，可在「设置 → 记录」关掉「空选时收录剪贴板」 |
+| 网页记忆 | 存网页时附上页面描述和头部截图，链接不再只是一行字；同一网址再存会归并到原来那条笔记，而不是散落各处 |
 | 截图文字识别 | 本机识别中英文，写进图片下方默认折叠的块，日后能搜到 |
 | Markdown 实时渲染 | 编辑时就看到粗体、标题、列表、代码；⌘B ⌘I ⌘K 等快捷键和格式栏 |
 | 场景 | 给常用去处配快捷键：选预设、按快捷键、选笔记或文件夹，三步就能用 |
@@ -177,6 +178,7 @@ MIT © 2026 向阳乔木
 
 - **⌘⇧J — Quick note.** A floating editor with live Markdown rendering. Paste screenshots, drop images or videos, press ⌘↩.
 - **⌘⇧K — Capture selection.** Saves whatever is selected in the front app, without a window: web text (converted to Markdown, with page title and link), PDF text (line breaks repaired, with page number), Apple Books and Kindle quotes (citation parsed), code (fenced, language detected), or Finder files. With nothing selected it saves the clipboard (text, images, video, files) or the screenshot you just took. Each one is saved only once. The clipboard part can be turned off in Settings → Record.
+- **Page memory.** Saving a page also tucks its site description under the link, renders a screenshot of the page top a few seconds later, and appends to the note that already has the URL instead of duplicating it. Each part can be turned off in Settings → Record.
 - **Verbatim by default.** No bullets or quote markers are added to your content. Time and source go on a separate quote line, and both can be turned off. Presets: plain, time-first, list, quote, callout, or your own template.
 - **On-device OCR.** Text in screenshots is written to a folded callout under the image, so you can search for it later.
 - **Scenes.** Up to six named shortcuts (e.g. ⌃⌥1 Ideas, ⌃⌥2 Reading notes), each aimed at a note or folder. Pick a preset and it works immediately.
