@@ -1,0 +1,30 @@
+# Temporary verification workflow on the fork — not part of any PR.
+name: verify
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select latest Xcode
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          xcodebuild -version
+      - name: Build
+        run: swift build
+      - name: Selftest
+        run: .build/debug/Jot --selftest
+      - name: Snapshot record settings
+        run: .build/debug/Jot --snapshot record-settings.png --settings record
+      - uses: actions/upload-artifact@v4
+        with:
+          name: record-settings
+          path: record-settings.png
+      - name: Websnapshot smoke
+        run: .build/debug/Jot --websnapshot https://example.com web-snapshot.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-snapshot
+          path: web-snapshot.png
