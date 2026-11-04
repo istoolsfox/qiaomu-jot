@@ -33,6 +33,7 @@ enum WebSnapshot {
         }
 
         func start() {
+            web.navigationDelegate = self
             timeout = DispatchWorkItem { [weak self] in
                 print("snapshot timed out")
                 self?.finish(nil)
