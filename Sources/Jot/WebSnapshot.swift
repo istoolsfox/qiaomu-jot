@@ -17,13 +17,15 @@ enum WebSnapshot {
     private static var live: [Engine] = []
 
     private final class Engine: NSObject, WKNavigationDelegate {
+        private let url: URL
         private let web: WKWebView
         private let completion: (URL?) -> Void
         private var done = false
         private var timeout: DispatchWorkItem?
         var onDone: (() -> Void)?
 
-        private init(url: URL, completion: @escaping (URL?) -> Void) {
+        init(url: URL, completion: @escaping (URL?) -> Void) {
+            self.url = url
             let config = WKWebViewConfiguration()
             config.websiteDataStore = .nonPersistent()
             self.web = WKWebView(frame: NSRect(x: 0, y: 0, width: 1280, height: 720), configuration: config)

@@ -389,7 +389,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                             if recipe == nil, prefs.mergeSameUrl, ctx.kind == .browser, let url = ctx.url {
                                 let query = url.absoluteString
                                     .replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "\\", with: "")
-                                ContentSearch.run(query, in: vault) { hits in
+                                ContentSearch().run(query, in: vault) { hits in
                                     do {
                                         if let target = MergeTarget.pick(paths: hits.map { $0.0.path }, url: url.absoluteString, in: vault) {
                                             delivered(note: try w.append(content: result.markdown, attachments: result.files, ocr: ocr,
@@ -969,7 +969,7 @@ func selftest() -> Int32 {
     let oldNote = mv.appendingPathComponent("旧.md"), newNote = mv.appendingPathComponent("新.md")
     try? "看[链接](https://a.com/x) 的笔记".write(to: oldNote, atomically: true, encoding: .utf8)
     try? "又提到了 https://a.com/x 第二次".write(to: newNote, atomically: true, encoding: .utf8)
-    try? FileManager.default.setModificationDate(Date(timeIntervalSinceNow: -3600), ofItemAt: oldNote.path)
+    try? FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -3600)], ofItemAtPath: oldNote.path)
     check("merge: latest containing file wins", MergeTarget.pick(paths: ["旧.md", "新.md"], url: "https://a.com/x", in: mv)?.lastPathComponent ?? "", "新.md")
     try? "没有这个网址".write(to: newNote, atomically: true, encoding: .utf8)
     check("merge: files without the url are ignored", MergeTarget.pick(paths: ["旧.md", "新.md"], url: "https://a.com/x", in: mv)?.lastPathComponent ?? "", "旧.md")
