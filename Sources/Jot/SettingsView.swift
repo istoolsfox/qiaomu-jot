@@ -315,7 +315,7 @@ struct RecordSettings: View {
         }
         .formStyle(.grouped)
         .frame(width: settingsWidth,
-               height: 850 + (prefs.timestamp ? 44 : 0) + (prefs.timestamp && customTime ? 120 : 0) + (style == .custom ? 112 : 0))
+               height: 744 + (prefs.timestamp ? 44 : 0) + (prefs.timestamp && customTime ? 120 : 0) + (style == .custom ? 112 : 0))
         .onAppear { customTime = !TimeFormats.presets.contains { $0.format == prefs.timeFormat } }
     }
 
