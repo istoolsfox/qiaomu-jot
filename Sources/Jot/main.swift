@@ -960,7 +960,8 @@ func selftest() -> Int32 {
     check("desc: og:description + entity", LinkTitle.parseDescription(#"<meta property="og:description" content="一篇讲 JEPA 的长文 &amp; 备注"><meta name="description" content="fallback">"#) ?? "",
           "一篇讲 JEPA 的长文 & 备注")
     check("desc: name=description fallback", LinkTitle.parseDescription(#"<meta content="后备" name="description">"#) ?? "", "后备")
-    check("desc: truncates to 160", String(LinkTitle.parseDescription(#"<meta property="og:description" content="\(String(repeating: "长", count: 200))">"#)?.count ?? 0), "161")
+    let long = String(repeating: "长", count: 200)
+    check("desc: truncates to 160", String(LinkTitle.parseDescription("<meta property=\"og:description\" content=\"\(long)\">")?.count ?? 0), "161")
     check("desc: missing", LinkTitle.parseDescription("<p>没写描述</p>") ?? "nil", "nil")
 
     // Merge target: the latest modified candidate that really contains the URL.
