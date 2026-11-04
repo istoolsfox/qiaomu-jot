@@ -45,7 +45,7 @@ enum WebSnapshot {
                 webView.takeSnapshot(with: nil) { image, _ in
                     guard let self, let image, let tiff = image.tiffRepresentation,
                           let data = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else {
-                        finish(nil)
+                        self?.finish(nil)
                         return
                     }
                     let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -55,9 +55,9 @@ enum WebSnapshot {
                     do {
                         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
                         try data.write(to: file)
-                        finish(file)
+                        self.finish(file)
                     } catch {
-                        finish(nil)
+                        self.finish(nil)
                     }
                 }
             }
