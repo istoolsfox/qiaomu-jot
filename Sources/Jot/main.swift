@@ -415,7 +415,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                         if let target = MergeTarget.pick(paths: paths, url: url.absoluteString, in: vault) {
                                             if pageURL != nil, result.files.isEmpty {
                                                 // The bare link itself is already saved in this note: don't file it twice.
-                                                Toast.show("这个网页已经存过", detail: target.deletingPathExtension().lastPathComponent,
+                                                Toast.show("这个网页已经存过", detail: ctx.pageTitle ?? target.deletingPathExtension().lastPathComponent,
                                                            style: .success, actions: [
                                                     .init(title: "打开") { CaptureModel.open(note: target, vault: vault) },
                                                 ], duration: 4)

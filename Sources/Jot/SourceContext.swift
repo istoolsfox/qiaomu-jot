@@ -110,6 +110,13 @@ struct SourceContext {
         return t.isEmpty ? nil : t
     }
 
+    /// Two titles disagree only when both are non-empty and neither contains the other — the
+    /// same tab read twice titles the window a little differently ("X" vs "X - Google Chrome").
+    static func titlesMatch(_ a: String, _ b: String) -> Bool {
+        let x = a.lowercased(), y = b.lowercased()
+        return x.isEmpty || y.isEmpty || x.contains(y) || y.contains(x)
+    }
+
     static func cleanBrowserTitle(_ title: String, app: String) -> String {
         var t = title
         for sep in [" - ", " — ", " – "] where t.hasSuffix(sep + app) { t = String(t.dropLast((sep + app).count)) }
@@ -149,8 +156,16 @@ struct SourceContext {
             script = "tell application id \"\(bundleID)\" to return {URL, title} of active tab of front window"
         } else { return }
         guard let list = Self.runScript(script, note: &scriptNote), list.numberOfItems >= 2 else { return }
+        // Apple Events land on whichever copy of the browser owns the scripting registration —
+        // with an automation copy of Chrome running that can be a different one. The title of the
+        // real frontmost app's window (read over AX, which is pid-bound) is the check.
+        let t = list.atIndex(2)?.stringValue ?? ""
+        if let mine = windowTitle, !t.isEmpty, !Self.titlesMatch(t, mine) {
+            scriptNote = "ignored: answer came from another browser instance"
+            return
+        }
         url = list.atIndex(1)?.stringValue.flatMap(URL.init(string:))
-        if let t = list.atIndex(2)?.stringValue, !t.isEmpty { pageTitle = t }
+        if !t.isEmpty { pageTitle = t }
     }
 
     private mutating func fillMailFromAppleScript() {
