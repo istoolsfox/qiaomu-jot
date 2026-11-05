@@ -1014,7 +1014,7 @@ if CommandLine.arguments.contains("--context") {
     _ = NSApplication.shared
     if let ctx = SourceContext.current() {
         print("app:   \(ctx.appName) (\(ctx.bundleID))")
-        print("kind:  \(ctx.kind.rawValue)")
+        print("kind:  \(String(describing: ctx.kind))")
         print("url:   \(ctx.url?.absoluteString ?? "nil")")
         print("title: \(ctx.pageTitle ?? "nil")")
     } else {
