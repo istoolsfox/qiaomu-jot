@@ -6,29 +6,39 @@ import WebKit
 /// analytics networks are blocked and common ad containers hidden, so the picture shows the
 /// page, not its commercials.
 enum WebSnapshot {
-    /// Ad, tracker and analytics hosts, as regex fragments matched inside the request URL.
-    private static let blockedHosts = [
-        "doubleclick\\.net", "googlesyndication\\.com", "googleadservices\\.com",
-        "google-analytics\\.com", "analytics\\.google\\.com", "adservice\\.google\\.[a-z.]+",
-        "adnxs\\.com", "adsrvr\\.org", "criteo\\.(?:com|net)", "rubiconproject\\.com",
-        "pubmatic\\.com", "openx\\.net", "smartadserver\\.com", "taboola\\.com",
-        "outbrain\\.com", "amazon-adsystem\\.com", "moatads\\.com", "scorecardresearch\\.com",
-        "quantserve\\.com", "connect\\.facebook\\.net", "analytics\\.tiktok\\.com",
-        "ads-twitter\\.com", "analytics\\.twitter\\.com", "hotjar\\.com", "clarity\\.ms",
-        "bat\\.bing\\.com", "pos\\.baidu\\.com", "hm\\.baidu\\.com", "tanx\\.com",
-        "mediav\\.com", "miaozhen\\.com", "ipinyou\\.(?:com|net)", "admaster\\.com\\.cn",
-        "cnzz\\.com", "umeng\\.(?:co|com)", "growingio\\.com",
+    /// Ad, tracker and analytics hosts: Peter Lowe's curated server list bundled in the app,
+    /// plus the Chinese ad networks his list doesn't cover.
+    static let adHosts: [String] = {
+        let bundled = Bundle.main.url(forResource: "ad-domains", withExtension: "txt", subdirectory: "AdBlock")
+        var hosts = bundled.flatMap { try? String(contentsOf: $0, encoding: .utf8) }?
+            .split(separator: "\n").map { $0.lowercased() }
+            .filter { $0.range(of: #"^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$"#, options: .regularExpression) != nil } ?? []
+        for host in guaranteedHosts where !hosts.contains(host) { hosts.append(host) }
+        return hosts
+    }()
+    /// Kept even if the bundled list file goes missing.
+    private static let guaranteedHosts = [
+        "doubleclick.net", "googlesyndication.com", "googleadservices.com",
+        "google-analytics.com", "analytics.google.com", "adservice.google.com",
+        "adnxs.com", "adsrvr.org", "criteo.com", "criteo.net", "rubiconproject.com",
+        "pubmatic.com", "openx.net", "smartadserver.com", "taboola.com", "outbrain.com",
+        "amazon-adsystem.com", "moatads.com", "scorecardresearch.com", "quantserve.com",
+        "connect.facebook.net", "analytics.tiktok.com", "ads-twitter.com", "analytics.twitter.com",
+        "hotjar.com", "clarity.ms", "bat.bing.com", "pos.baidu.com", "hm.baidu.com",
+        "tanx.com", "mediav.com", "miaozhen.com", "ipinyou.com", "ipinyou.net",
+        "admaster.com.cn", "cnzz.com", "umeng.co", "umeng.com", "growingio.com",
     ]
     /// Ad containers hidden from layout, so blocked slots don't leave grey boxes behind.
     private static let hiddenSelectors = "ins.adsbygoogle, .adsbygoogle, .ad-banner, .advert, " +
         ".advertisement, .ad-slot, [id^=\"ad_\"], [id^=\"ads_\"], [id^=\"google_ads\"], " +
         "iframe[src*=\"doubleclick\"], iframe[src*=\"googlesyndication\"], iframe[src*=\"taboola\"]"
 
-    /// The content rule list built from the lists above (the store caches it by identifier).
+    /// The content rule list built from the host list (the store caches it by identifier).
     private static func blockList(then: @escaping (WKContentRuleList?) -> Void) {
-        var rules: [[String: Any]] = blockedHosts.map { host in
-            ["trigger": ["url-filter": "https?://[^/]*\(host)"],
-             "action": ["type": "block"]]
+        var rules: [[String: Any]] = adHosts.map { host in
+            let pattern = host.replacingOccurrences(of: ".", with: "\\.")
+            return ["trigger": ["url-filter": "https?://([^/]*\\.)?\(pattern)"],
+                    "action": ["type": "block"]]
         }
         rules.append(["trigger": ["url-filter": ".*"],
                       "action": ["type": "css-display-none"], "selector": hiddenSelectors])

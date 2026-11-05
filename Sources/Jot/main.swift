@@ -1027,6 +1027,7 @@ func selftest() -> Int32 {
     check("heading: marks stripped", CaptureFormatter.sectionHeading(from: "### 标题 ##") ?? "", "## 标题")
     check("heading: capped", String(CaptureFormatter.sectionHeading(from: String(repeating: "字", count: 200))?.count ?? 0), "44")
     check("heading: whitespace only is nil", String(CaptureFormatter.sectionHeading(from: "   ") == nil), "true")
+    check("adblock: bundled host list ships with the app", String(WebSnapshot.adHosts.count > 3000), "true")
 
     print(failures == 0 ? "ALL PASS" : "\(failures) FAILED")
     return failures == 0 ? 0 : 1
