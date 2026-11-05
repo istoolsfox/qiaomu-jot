@@ -84,7 +84,10 @@ struct SourceContext {
             ctx.url = area.flatMap(AX.url)
             ctx.pageTitle = area.flatMap { AX.string($0, kAXTitleAttribute) }.flatMap(nonEmpty)
                 ?? ctx.windowTitle.map { cleanBrowserTitle($0, app: ctx.appName) }
-            if ctx.url == nil { ctx.fillFromAppleScript() }
+            // Chromium's AX often reports the wrong web area (a background new-tab page): anything
+            // that isn't a real web page gets a second opinion from the browser itself.
+            let scheme = ctx.url?.scheme?.lowercased()
+            if scheme != "https" && scheme != "http" { ctx.fillFromAppleScript() }
             if ctx.url?.pathExtension.lowercased() == "pdf" { ctx.fileName = ctx.url?.lastPathComponent }
         case .pdf, .book:
             ctx.fileName = documentURL?.lastPathComponent ?? ctx.windowTitle.flatMap(fileName(inTitle:))

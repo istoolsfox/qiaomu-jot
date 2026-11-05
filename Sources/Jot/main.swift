@@ -392,8 +392,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                 ContentSearch().run(query, in: vault) { hits in
                                     do {
                                         if let target = MergeTarget.pick(paths: hits.map { $0.0.path }, url: url.absoluteString, in: vault) {
-                                            delivered(note: try w.append(content: result.markdown, attachments: result.files, ocr: ocr,
-                                                                         source: result.source, asTask: recipe?.asTask ?? false, to: target))
+                                            if pageURL != nil, result.files.isEmpty {
+                                                // The bare link itself is already saved in this note: don't file it twice.
+                                                Toast.show("这个网页已经存过", detail: target.deletingPathExtension().lastPathComponent,
+                                                           style: .success, actions: [
+                                                    .init(title: "打开") { CaptureModel.open(note: target, vault: vault) },
+                                                ], duration: 4)
+                                            } else {
+                                                delivered(note: try w.append(content: result.markdown, attachments: result.files, ocr: ocr,
+                                                                             source: result.source, asTask: recipe?.asTask ?? false, to: target))
+                                            }
                                         } else {
                                             delivered(note: try dailyAppend())
                                         }
@@ -440,7 +448,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                     title = MediaKind(shot.url) == .video ? "已收录刚才的录屏" : "已收录刚才的截图"
                     toastSource = nil
                     detail = shot.url.lastPathComponent
-                } else if ctx.kind == .browser, let link = CaptureFormatter.pageLink(ctx), let url = ctx.url {
+                } else if ctx.kind == .browser, let link = CaptureFormatter.pageLink(ctx), let url = ctx.url,
+                          url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "http" {
                     pageURL = url
                     func useLink(_ markdown: String) {
                         result = .init(markdown: markdown, files: [], tempDirs: [], source: nil)
@@ -997,6 +1006,20 @@ if let i = CommandLine.arguments.firstIndex(of: "--search"), i + 2 < CommandLine
         done = true
     }
     while !done && Date().timeIntervalSince(t1) < 10 { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+    exit(0)
+}
+
+/// `Jot --context`: print what SourceContext currently sees (debugging capture sources).
+if CommandLine.arguments.contains("--context") {
+    _ = NSApplication.shared
+    if let ctx = SourceContext.current() {
+        print("app:   \(ctx.appName) (\(ctx.bundleID))")
+        print("kind:  \(ctx.kind.rawValue)")
+        print("url:   \(ctx.url?.absoluteString ?? "nil")")
+        print("title: \(ctx.pageTitle ?? "nil")")
+    } else {
+        print("nil")
+    }
     exit(0)
 }
 
