@@ -1017,6 +1017,7 @@ if CommandLine.arguments.contains("--context") {
         print("kind:  \(String(describing: ctx.kind))")
         print("url:   \(ctx.url?.absoluteString ?? "nil")")
         print("title: \(ctx.pageTitle ?? "nil")")
+        if let note = ctx.scriptNote { print("note:  \(note)") }
     } else {
         print("nil")
     }

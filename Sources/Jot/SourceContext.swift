@@ -17,6 +17,8 @@ struct SourceContext {
     var pdfPage: Int?
     var mailLink: URL?
     var mailSubject: String?
+    /// Why the browser AppleScript fallback failed, for the `--context` debug output.
+    var scriptNote: String?
 
     /// Never capture from password managers.
     static let privateApps: Set<String> = [
@@ -80,14 +82,15 @@ struct SourceContext {
 
         switch ctx.kind {
         case .browser:
-            let area = AX.focusedElement().flatMap(AX.webArea(containing:)) ?? window.flatMap(AX.findWebArea(in:))
-            ctx.url = area.flatMap(AX.url)
-            ctx.pageTitle = area.flatMap { AX.string($0, kAXTitleAttribute) }.flatMap(nonEmpty)
-                ?? ctx.windowTitle.map { cleanBrowserTitle($0, app: ctx.appName) }
-            // Chromium's AX often reports the wrong web area (a background new-tab page): anything
-            // that isn't a real web page gets a second opinion from the browser itself.
-            let scheme = ctx.url?.scheme?.lowercased()
-            if scheme != "https" && scheme != "http" { ctx.fillFromAppleScript() }
+            // Chromium's accessibility tree often reports a background new-tab page,
+            // so scriptable browsers answer for themselves; the tree is only a fallback.
+            if Self.chromiumScriptable.contains(ctx.bundleID) { ctx.fillFromAppleScript() }
+            if ctx.url == nil {
+                let area = AX.focusedElement().flatMap(AX.webArea(containing:)) ?? window.flatMap(AX.findWebArea(in:))
+                ctx.url = area.flatMap(AX.url)
+                ctx.pageTitle = area.flatMap { AX.string($0, kAXTitleAttribute) }.flatMap(nonEmpty)
+                    ?? ctx.windowTitle.map { cleanBrowserTitle($0, app: ctx.appName) }
+            }
             if ctx.url?.pathExtension.lowercased() == "pdf" { ctx.fileName = ctx.url?.lastPathComponent }
         case .pdf, .book:
             ctx.fileName = documentURL?.lastPathComponent ?? ctx.windowTitle.flatMap(fileName(inTitle:))
@@ -145,7 +148,7 @@ struct SourceContext {
         } else if Self.chromiumScriptable.contains(bundleID) {
             script = "tell application id \"\(bundleID)\" to return {URL, title} of active tab of front window"
         } else { return }
-        guard let list = Self.runScript(script), list.numberOfItems >= 2 else { return }
+        guard let list = Self.runScript(script, note: &scriptNote), list.numberOfItems >= 2 else { return }
         url = list.atIndex(1)?.stringValue.flatMap(URL.init(string:))
         if let t = list.atIndex(2)?.stringValue, !t.isEmpty { pageTitle = t }
     }
@@ -159,16 +162,17 @@ struct SourceContext {
             return {message id of m, subject of m}
         end tell
         """
-        guard let list = Self.runScript(script), list.numberOfItems >= 2,
+        guard let list = Self.runScript(script, note: &scriptNote), list.numberOfItems >= 2,
               let id = list.atIndex(1)?.stringValue, !id.isEmpty else { return }
         let encoded = "<\(id)>".addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? id
         mailLink = URL(string: "message://\(encoded)")
         mailSubject = list.atIndex(2)?.stringValue
     }
 
-    private static func runScript(_ source: String) -> NSAppleEventDescriptor? {
+    private static func runScript(_ source: String, note: inout String?) -> NSAppleEventDescriptor? {
         var err: NSDictionary?
         let result = NSAppleScript(source: source)?.executeAndReturnError(&err)
+        if let n = err?["NSAppleScriptErrorNumber"] as? Int { note = "AppleScript error \(n)" }
         return err == nil ? result : nil
     }
 }
