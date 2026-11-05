@@ -50,8 +50,6 @@ final class Prefs: ObservableObject {
     @AppStorage("pageDescription") var pageDescription: Bool = true
     /// A saved page link gets an offscreen render of the page top tucked under the entry.
     @AppStorage("pageSnapshot") var pageSnapshot: Bool = true
-    /// ⌘⇧K on a page saved before appends to that note instead of the daily note.
-    @AppStorage("mergeSameUrl") var mergeSameUrl: Bool = true
     /// Daily notes in a plain (non-Obsidian) folder.
     @AppStorage("plainDailyFolder") var plainDailyFolder: String = "日记"
     @AppStorage("plainDailyFormat") var plainDailyFormat: String = "YYYY-MM-DD"

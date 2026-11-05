@@ -405,7 +405,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                 return note
                             }
                             // This page is already saved somewhere in the vault: add to its section instead.
-                            if recipe == nil, prefs.mergeSameUrl, ctx.kind == .browser, let url = ctx.url {
+                            if recipe == nil, ctx.kind == .browser, let url = ctx.url {
                                 let query = url.absoluteString
                                     .replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "\\", with: "")
                                 ContentSearch().run(query, in: vault) { hits in
