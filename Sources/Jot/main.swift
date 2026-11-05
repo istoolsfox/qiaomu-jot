@@ -359,14 +359,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                             ], duration: 6)
                             return
                         }
-                        // A page link saved bare: render the top of the page and tuck it under this entry.
-                        if prefs.pageSnapshot, let page = pageURL, result.files.isEmpty, let entry = History.last {
-                            WebSnapshot.capture(page) { file in
-                                guard let file, let current = History.last,
-                                      current.note == entry.note, current.entry == entry.entry else { return }
-                                defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
-                                if (try? w.amend(current, text: "", attachments: [file])) != nil {
-                                    Toast.show("已补上网页快照", style: .success)
+                        // A page link saved bare: fetch its description and the top of the page, then
+                        // tuck both under the entry once they arrive (PDFs have no meta tags to parse).
+                        if let page = pageURL, result.files.isEmpty, let entry = History.last {
+                            let wantDesc = prefs.pageDescription && page.pathExtension.lowercased() != "pdf"
+                            if wantDesc || prefs.pageSnapshot {
+                                var text: String?
+                                var shot: URL?
+                                let group = DispatchGroup()
+                                if wantDesc {
+                                    group.enter()
+                                    LinkTitle.meta(page, timeout: 3) { meta in
+                                        if let d = meta?.description { text = "\n> " + d }
+                                        group.leave()
+                                    }
+                                }
+                                if prefs.pageSnapshot {
+                                    group.enter()
+                                    WebSnapshot.capture(page) { file in shot = file; group.leave() }
+                                }
+                                group.notify(queue: .main) {
+                                    defer { if let shot { try? FileManager.default.removeItem(at: shot.deletingLastPathComponent()) } }
+                                    guard let current = History.last, current.note == entry.note, current.entry == entry.entry,
+                                          text != nil || shot != nil else { return }
+                                    if (try? w.amend(current, text: text ?? "", attachments: shot.map { [$0] } ?? [])) != nil {
+                                        Toast.show(shot != nil ? "已补上网页快照" : "已补上页面描述", style: .success)
+                                    }
                                 }
                             }
                         }
@@ -391,7 +409,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                     .replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "\\", with: "")
                                 ContentSearch().run(query, in: vault) { hits in
                                     do {
-                                        if let target = MergeTarget.pick(paths: hits.map { $0.0.path }, url: url.absoluteString, in: vault) {
+                                        // Spotlight lags behind a note written seconds ago: today's note is always a candidate.
+                                        var paths = hits.map { $0.0.path }
+                                        paths.append(w.noteURL(for: Date()).standardizedFileURL.path)
+                                        if let target = MergeTarget.pick(paths: paths, url: url.absoluteString, in: vault) {
                                             if pageURL != nil, result.files.isEmpty {
                                                 // The bare link itself is already saved in this note: don't file it twice.
                                                 Toast.show("这个网页已经存过", detail: target.deletingPathExtension().lastPathComponent,
@@ -450,21 +471,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                     detail = shot.url.lastPathComponent
                 } else if ctx.kind == .browser, let link = CaptureFormatter.pageLink(ctx), let url = ctx.url,
                           url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "http" {
+                    // Save right away; the description and snapshot tuck in afterwards (see delivered).
                     pageURL = url
-                    func useLink(_ markdown: String) {
-                        result = .init(markdown: markdown, files: [], tempDirs: [], source: nil)
-                        title = "已收录当前网页"
-                    }
-                    // The link alone is forgettable: fetch the page description first (3s cap), then save.
-                    if prefs.pageDescription {
-                        LinkTitle.meta(url, timeout: 3) { meta in
-                            if let d = meta?.description { useLink(link + "\n> " + d) } else { useLink(link) }
-                            save()
-                        }
-                        return      // save() runs from the completion above
-                    } else {
-                        useLink(link)
-                    }
+                    result = .init(markdown: link, files: [], tempDirs: [], source: nil)
+                    title = "已收录当前网页"
                 } else if prefs.clipboardFallback, let clip = watcher.clip() {
                     useClip(clip)
                 } else {

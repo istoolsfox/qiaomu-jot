@@ -229,8 +229,9 @@ final class ContentSearch {
 enum MergeTarget {
     static func pick(paths: [String], url: String, in vault: URL) -> URL? {
         var best: (file: URL, modified: Date)?
-        for p in paths.prefix(15) where p.hasSuffix(".md") {
-            let file = vault.appendingPathComponent(p)
+        let root = vault.standardizedFileURL.path
+        for p in paths.prefix(20) where p.hasSuffix(".md") {
+            let file = URL(fileURLWithPath: p.hasPrefix("/") ? p : root + "/" + p)
             guard let text = try? String(contentsOf: file, encoding: .utf8), text.contains(url) else { continue }
             let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
             if best == nil || modified > best!.modified { best = (file, modified) }
