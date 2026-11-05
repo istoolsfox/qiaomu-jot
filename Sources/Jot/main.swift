@@ -478,7 +478,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 } else if prefs.clipboardFallback, let clip = watcher.clip() {
                     useClip(clip)
                 } else {
-                    Toast.show(prefs.clipboardFallback ? "没有选中内容，剪贴板也是空的" : "没有选中内容", detail: ctx.appName, style: .warning, actions: [
+                    Toast.show(prefs.clipboardFallback ? "没有选中内容，剪贴板也是空的" : "没有选中内容",
+                               detail: ctx.kind == .browser ? "当前浏览器页面没有内容" : "前台是 \(ctx.appName)", style: .warning, actions: [
                         .init(title: "打开输入框") { [weak self] in self?.show() },
                     ])
                     return
