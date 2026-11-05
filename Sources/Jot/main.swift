@@ -359,27 +359,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                             ], duration: 6)
                             return
                         }
-                        // A page link saved bare: its own description tucks in on arrival (PDFs have
-                        // none to parse); the snapshot waits for the「补张快照」button on the toast.
-                        if let page = pageURL, result.files.isEmpty, let entry = History.last,
-                           prefs.pageDescription, page.pathExtension.lowercased() != "pdf" {
-                            LinkTitle.description(page, timeout: 3) { d in
-                                guard let d, let current = History.last,
-                                      current.note == entry.note, current.entry.hasPrefix(entry.entry) else { return }
-                                if (try? w.amend(current, text: "\n> " + d, attachments: [])) != nil {
-                                    Toast.show("已补上页面描述", style: .success)
+                        // A page link saved bare: its own description and a head snapshot tuck in on
+                        // arrival (PDFs have no description to parse; the renderer has no browser
+                        // login state, so login walls simply skip).
+                        if let page = pageURL, result.files.isEmpty, let entry = History.last {
+                            if prefs.pageDescription, page.pathExtension.lowercased() != "pdf" {
+                                LinkTitle.description(page, timeout: 3) { d in
+                                    guard let d, let current = History.last,
+                                          current.note == entry.note, current.entry.hasPrefix(entry.entry) else { return }
+                                    if (try? w.amend(current, text: "\n> " + d, attachments: [])) != nil {
+                                        Toast.show("已补上页面描述", style: .success)
+                                    }
                                 }
                             }
-                        }
-                        var toastActions: [Toast.Action] = [
-                            .init(title: "撤销") { self?.undoLast() },
-                            .init(title: "补充想法") { History.last.map { self?.show(amend: $0) } },
-                        ]
-                        // The snapshot is the reader's call: it renders only when invited.
-                        if prefs.pageSnapshot, let page = pageURL, result.files.isEmpty, let entry = History.last {
-                            toastActions.append(.init(title: "补张快照") {
-                                guard let current = History.last, current.note == entry.note,
-                                      current.entry.hasPrefix(entry.entry) else { return }
+                            if prefs.pageSnapshot {
                                 WebSnapshot.capture(page) { file in
                                     guard let file else { return }
                                     defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
@@ -389,9 +382,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                         Toast.show("已补上网页快照", style: .success)
                                     }
                                 }
-                            })
+                            }
                         }
-                        Toast.show(title, detail: detail, source: toastSource, actions: toastActions, duration: 3.2)
+                        Toast.show(title, detail: detail, source: toastSource, actions: [
+                            .init(title: "撤销") { self?.undoLast() },
+                            .init(title: "补充想法") { History.last.map { self?.show(amend: $0) } },
+                        ], duration: 3.2)
                     }
                     do {
                         let dest = recipe?.destination ?? .daily

@@ -307,8 +307,8 @@ struct RecordSettings: View {
             Section {
                 Toggle("存网页时附上页面描述", isOn: $prefs.pageDescription)
                     .help("存网页链接时顺带抓取页面描述（og:description）写在链接下方，日后能搜到")
-                Toggle("存网页后可补一张头部快照", isOn: $prefs.pageSnapshot)
-                    .help("收录网页后弹窗上出现「补张快照」按钮，点了才后台渲染网页顶部并存到该条下方；渲染器没有浏览器登录态，登录墙站点会失败")
+                Toggle("存网页时自动附上头部截图", isOn: $prefs.pageSnapshot)
+                    .help("后台渲染网页顶部并自动补到该条下方；渲染器没有浏览器登录态，登录墙站点会失败")
                 Toggle("同网址归并到已存笔记", isOn: $prefs.mergeSameUrl)
                     .help("⌘⇧K 时这个网页已经存过的话，补充想法、选中的文字和文件都归到原来那条的章节下，而不是再存一条链接")
             }
