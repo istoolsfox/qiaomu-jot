@@ -401,8 +401,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                 // Page entries read as outline sections: separate them from what came before.
                                 var content = result.markdown
                                 if pageURL != nil, result.files.isEmpty,
-                                   let note = try? w.noteURL(for: Date()),
-                                   let existing = try? String(contentsOf: note, encoding: .utf8),
+                                   let existing = try? String(contentsOf: w.noteURL(for: Date()), encoding: .utf8),
                                    !existing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                     content = "---\n" + content
                                 }
@@ -421,29 +420,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                         var paths = hits.map { $0.0.path }
                                         paths.append(w.noteURL(for: Date()).standardizedFileURL.path)
                                         if let target = MergeTarget.pick(paths: paths, url: url.absoluteString, in: vault) {
+                                            // Never file the link twice: thoughts, selections and files join its section.
                                             let page = History.Entry(note: target.file, entry: target.entry, files: [], indent: "")
-                                            if pageURL != nil, result.files.isEmpty {
-                                                // The link itself is already recorded: invite a thought under it, not a second link.
-                                                Toast.show("这个网页已经存过", detail: ctx.pageTitle ?? "",
-                                                           style: .success, actions: [
-                                                    .init(title: "补充想法") { self?.show(amend: page) },
-                                                ], duration: 4)
-                                            } else if let heading = CaptureFormatter.sectionHeading(from: g.text) {
-                                                // Selected text of a recorded page: an H2 section under its entry.
-                                                try w.amend(page, text: heading, attachments: [])
-                                                Toast.show("已补充到「\(ctx.pageTitle ?? "")」", detail: target.file.deletingPathExtension().lastPathComponent,
-                                                           style: .success, actions: [
-                                                    .init(title: "撤销") { self?.undoLast() },
-                                                ], duration: 4)
-                                            } else {
-                                                // Files and everything else join the page's section as embeds.
-                                                defer { for d in result.tempDirs { try? FileManager.default.removeItem(at: d) } }
-                                                try w.amend(page, text: "", attachments: result.files, ocr: ocr)
-                                                Toast.show("已补充到「\(ctx.pageTitle ?? "")」", detail: target.file.deletingPathExtension().lastPathComponent,
-                                                           style: .success, actions: [
-                                                    .init(title: "撤销") { self?.undoLast() },
-                                                ], duration: 4)
-                                            }
+                                            let bare = pageURL != nil
+                                            self?.supplementPage(page, text: bare ? "" : g.text, files: bare ? [] : result.files,
+                                                                 tempDirs: result.tempDirs, ocr: ocr, pageTitle: ctx.pageTitle, writer: w)
                                         } else {
                                             delivered(note: try dailyAppend())
                                         }
@@ -587,6 +568,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             NSWorkspace.shared.open(URL(fileURLWithPath: path)); return
         }
         CaptureModel.open(note: URL(fileURLWithPath: path), vault: vault)
+    }
+
+    /// The page is already recorded somewhere in the vault: never file its link twice — a
+    /// thought, a selection or files all join that page's section instead.
+    private func supplementPage(_ page: History.Entry, text: String, files: [URL], tempDirs: [URL],
+                                ocr: [String: String], pageTitle: String?, writer w: DailyNoteWriter) {
+        if text.isEmpty, files.isEmpty {
+            Toast.show("这个网页已经存过", detail: pageTitle ?? "", style: .success, actions: [
+                .init(title: "补充想法") { [weak self] in self?.show(amend: page) },
+            ], duration: 4)
+            return
+        }
+        defer { for d in tempDirs { try? FileManager.default.removeItem(at: d) } }
+        do {
+            let heading = CaptureFormatter.sectionHeading(from: text)
+            try w.amend(page, text: heading ?? "", attachments: files, ocr: ocr)
+            Toast.show("已补充到「\(pageTitle ?? "")」", detail: page.note.deletingPathExtension().lastPathComponent,
+                       style: .success, actions: [
+                .init(title: "撤销") { [weak self] in self?.undoLast() },
+            ], duration: 4)
+        } catch {
+            Toast.show("保存失败", detail: error.localizedDescription, style: .warning)
+        }
     }
 
     @objc func undoLast() {

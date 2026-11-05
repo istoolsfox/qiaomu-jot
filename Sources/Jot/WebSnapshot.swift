@@ -34,8 +34,9 @@ enum WebSnapshot {
 
         func start() {
             web.navigationDelegate = self
+            let target = url.absoluteString
             timeout = DispatchWorkItem { [weak self] in
-                print("snapshot timed out")
+                print("snapshot timed out: \(target)")
                 self?.finish(nil)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: timeout!)
@@ -68,7 +69,7 @@ enum WebSnapshot {
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            print("webview error: \(error.localizedDescription)")
+            print("webview error: \(url.absoluteString) — \(error.localizedDescription)")
             finish(nil)
         }
 

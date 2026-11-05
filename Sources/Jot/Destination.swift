@@ -221,7 +221,7 @@ final class ContentSearch {
         let before = line[..<lr.lowerBound], after = line[lr.upperBound...]
         let head = before.count > 18 ? "…" + before.suffix(18) : String(before)
         let tail = after.count > 40 ? after.prefix(40) + "…" : String(after)
-        return head + line[lr] + tail
+        return head + String(line[lr.lowerBound..<lr.upperBound]) + tail
     }
 }
 
