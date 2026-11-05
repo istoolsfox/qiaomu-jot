@@ -359,39 +359,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                             ], duration: 6)
                             return
                         }
-                        // A page link saved bare: fetch its description and the top of the page, then
-                        // tuck both under the entry once they arrive (PDFs have no meta tags to parse).
-                        if let page = pageURL, result.files.isEmpty, let entry = History.last {
-                            let wantDesc = prefs.pageDescription && page.pathExtension.lowercased() != "pdf"
-                            if wantDesc || prefs.pageSnapshot {
-                                var text: String?
-                                var shot: URL?
-                                let group = DispatchGroup()
-                                if wantDesc {
-                                    group.enter()
-                                    LinkTitle.description(page, timeout: 3) { d in
-                                        if let d { text = "\n> " + d }
-                                        group.leave()
-                                    }
-                                }
-                                if prefs.pageSnapshot {
-                                    group.enter()
-                                    WebSnapshot.capture(page) { file in shot = file; group.leave() }
-                                }
-                                group.notify(queue: .main) {
-                                    defer { if let shot { try? FileManager.default.removeItem(at: shot.deletingLastPathComponent()) } }
-                                    guard let current = History.last, current.note == entry.note, current.entry == entry.entry,
-                                          text != nil || shot != nil else { return }
-                                    if (try? w.amend(current, text: text ?? "", attachments: shot.map { [$0] } ?? [])) != nil {
-                                        Toast.show(shot != nil ? "已补上网页快照" : "已补上页面描述", style: .success)
-                                    }
+                        // A page link saved bare: its own description tucks in on arrival (PDFs have
+                        // none to parse); the snapshot waits for the「补张快照」button on the toast.
+                        if let page = pageURL, result.files.isEmpty, let entry = History.last,
+                           prefs.pageDescription, page.pathExtension.lowercased() != "pdf" {
+                            LinkTitle.description(page, timeout: 3) { d in
+                                guard let d, let current = History.last,
+                                      current.note == entry.note, current.entry.hasPrefix(entry.entry) else { return }
+                                if (try? w.amend(current, text: "\n> " + d, attachments: [])) != nil {
+                                    Toast.show("已补上页面描述", style: .success)
                                 }
                             }
                         }
-                        Toast.show(title, detail: detail, source: toastSource, actions: [
+                        var toastActions: [Toast.Action] = [
                             .init(title: "撤销") { self?.undoLast() },
                             .init(title: "补充想法") { History.last.map { self?.show(amend: $0) } },
-                        ], duration: 3.2)
+                        ]
+                        // The snapshot is the reader's call: it renders only when invited.
+                        if prefs.pageSnapshot, let page = pageURL, result.files.isEmpty, let entry = History.last {
+                            toastActions.append(.init(title: "补张快照") {
+                                guard let current = History.last, current.note == entry.note,
+                                      current.entry.hasPrefix(entry.entry) else { return }
+                                WebSnapshot.capture(page) { file in
+                                    guard let file else { return }
+                                    defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+                                    guard let now = History.last, now.note == entry.note,
+                                          now.entry.hasPrefix(entry.entry) else { return }
+                                    if (try? w.amend(now, text: "", attachments: [file])) != nil {
+                                        Toast.show("已补上网页快照", style: .success)
+                                    }
+                                }
+                            })
+                        }
+                        Toast.show(title, detail: detail, source: toastSource, actions: toastActions, duration: 3.2)
                     }
                     do {
                         let dest = recipe?.destination ?? .daily
@@ -571,21 +571,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     /// The page is already recorded somewhere in the vault: never file its link twice — a
-    /// thought, a selection or files all join that page's section instead.
+    /// thought, a selection or files all land at the end of that page's section.
     private func supplementPage(_ page: History.Entry, text: String, files: [URL], tempDirs: [URL],
                                 ocr: [String: String], pageTitle: String?, writer w: DailyNoteWriter) {
+        let anchor = MergeTarget.sectionEnd(page)
         if text.isEmpty, files.isEmpty {
             Toast.show("这个网页已经存过", detail: pageTitle ?? "", style: .success, actions: [
-                .init(title: "补充想法") { [weak self] in self?.show(amend: page) },
+                .init(title: "补充想法") { [weak self] in self?.show(amend: anchor) },
             ], duration: 4)
             return
         }
         defer { for d in tempDirs { try? FileManager.default.removeItem(at: d) } }
         do {
-            let heading = CaptureFormatter.sectionHeading(from: text)
-            try w.amend(page, text: heading ?? "", attachments: files, ocr: ocr)
+            // A selection keeps its full text: a short heading for the outline, a quote below.
+            var added: [String] = []
+            if let heading = CaptureFormatter.sectionHeading(from: text) { added.append(heading) }
+            if text.count > 40 { added.append(CaptureFormatter.quote(text)) }
+            try w.amend(anchor, text: added.joined(separator: "\n"), attachments: files, ocr: ocr)
             Toast.show("已补充到「\(pageTitle ?? "")」", detail: page.note.deletingPathExtension().lastPathComponent,
                        style: .success, actions: [
+                .init(title: "补充想法") { [weak self] in History.last.map { self?.show(amend: $0) } },
                 .init(title: "撤销") { [weak self] in self?.undoLast() },
             ], duration: 4)
         } catch {
@@ -1026,7 +1031,7 @@ func selftest() -> Int32 {
     // Selected text of a recorded page becomes a capped one-line H2 under its entry.
     check("heading: collapse + H2", CaptureFormatter.sectionHeading(from: "  a\n\nb  ") ?? "", "## a b")
     check("heading: marks stripped", CaptureFormatter.sectionHeading(from: "### 标题 ##") ?? "", "## 标题")
-    check("heading: capped", String(CaptureFormatter.sectionHeading(from: String(repeating: "字", count: 200))?.count ?? 0), "124")
+    check("heading: capped", String(CaptureFormatter.sectionHeading(from: String(repeating: "字", count: 200))?.count ?? 0), "44")
     check("heading: whitespace only is nil", String(CaptureFormatter.sectionHeading(from: "   ") == nil), "true")
 
     print(failures == 0 ? "ALL PASS" : "\(failures) FAILED")

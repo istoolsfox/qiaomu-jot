@@ -240,6 +240,18 @@ enum MergeTarget {
         }
         return best.map { (file: $0.file, entry: $0.entry) }
     }
+
+    /// The page's whole section as one amend anchor: from its line down to the last line before
+    /// the next `#` heading or `---` rule — so additions land below everything the page owns.
+    static func sectionEnd(_ page: History.Entry) -> History.Entry {
+        guard let text = try? String(contentsOf: page.note, encoding: .utf8) else { return page }
+        let lines = text.components(separatedBy: "\n")
+        guard let i = lines.firstIndex(of: page.entry) else { return page }
+        var j = i
+        while j + 1 < lines.count,
+              lines[j + 1].range(of: #"^(?:#\s|---\s*$)"#, options: .regularExpression) == nil { j += 1 }
+        return History.Entry(note: page.note, entry: lines[i...j].joined(separator: "\n"), files: [], indent: "")
+    }
 }
 
 enum NoteNaming {
