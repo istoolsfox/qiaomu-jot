@@ -66,6 +66,17 @@ enum CaptureFormatter {
         return SourceInfo(ctx).markdown
     }
 
+    /// Selected text of an already-recorded page becomes an H2 section under its entry:
+    /// one line, whitespace collapsed, markdown heading marks stripped, capped at 120 chars.
+    static func sectionHeading(from selection: String) -> String? {
+        let t = selection
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "#", with: "")
+            .trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty else { return nil }
+        return "## " + (t.count > 120 ? String(t.prefix(120)) + "…" : t)
+    }
+
     // MARK: Text cleanup
 
     static func quote(_ md: String) -> String {

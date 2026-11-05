@@ -225,18 +225,20 @@ final class ContentSearch {
     }
 }
 
-/// For 「同网址归并到已存笔记」: the most recently modified candidate that really contains the URL.
+/// For 「同网址归并到已存笔记」: the most recently modified candidate that really contains the
+/// URL, with the exact line it sits on so follow-ups can be amended right under it.
 enum MergeTarget {
-    static func pick(paths: [String], url: String, in vault: URL) -> URL? {
-        var best: (file: URL, modified: Date)?
+    static func pick(paths: [String], url: String, in vault: URL) -> (file: URL, entry: String)? {
+        var best: (file: URL, entry: String, modified: Date)?
         let root = vault.standardizedFileURL.path
         for p in paths.prefix(20) where p.hasSuffix(".md") {
             let file = URL(fileURLWithPath: p.hasPrefix("/") ? p : root + "/" + p)
-            guard let text = try? String(contentsOf: file, encoding: .utf8), text.contains(url) else { continue }
+            guard let text = try? String(contentsOf: file, encoding: .utf8),
+                  let line = text.components(separatedBy: "\n").first(where: { $0.contains(url) }) else { continue }
             let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-            if best == nil || modified > best!.modified { best = (file, modified) }
+            if best == nil || modified > best!.modified { best = (file, line, modified) }
         }
-        return best?.file
+        return best.map { (file: $0.file, entry: $0.entry) }
     }
 }
 

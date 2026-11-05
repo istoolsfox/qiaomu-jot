@@ -398,12 +398,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                         switch dest.kind {
                         case .daily:
                             func dailyAppend() throws -> URL {
-                                let note = try w.append(content: result.markdown, attachments: result.files, ocr: ocr,
+                                // Page entries read as outline sections: separate them from what came before.
+                                var content = result.markdown
+                                if pageURL != nil, result.files.isEmpty,
+                                   let note = try? w.noteURL(for: Date()),
+                                   let existing = try? String(contentsOf: note, encoding: .utf8),
+                                   !existing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    content = "---\n" + content
+                                }
+                                let note = try w.append(content: content, attachments: result.files, ocr: ocr,
                                                         source: result.source, asTask: recipe?.asTask ?? false, heading: prefs.insertHeading)
                                 _ = prefs.dailyCount(1)
                                 return note
                             }
-                            // This page is already saved somewhere in the vault: append there instead.
+                            // This page is already saved somewhere in the vault: add to its section instead.
                             if recipe == nil, prefs.mergeSameUrl, ctx.kind == .browser, let url = ctx.url {
                                 let query = url.absoluteString
                                     .replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "\\", with: "")
@@ -413,15 +421,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                         var paths = hits.map { $0.0.path }
                                         paths.append(w.noteURL(for: Date()).standardizedFileURL.path)
                                         if let target = MergeTarget.pick(paths: paths, url: url.absoluteString, in: vault) {
+                                            let page = History.Entry(note: target.file, entry: target.entry, files: [], indent: "")
                                             if pageURL != nil, result.files.isEmpty {
-                                                // The bare link itself is already saved in this note: don't file it twice.
-                                                Toast.show("这个网页已经存过", detail: ctx.pageTitle ?? target.deletingPathExtension().lastPathComponent,
+                                                // The link itself is already recorded: invite a thought under it, not a second link.
+                                                Toast.show("这个网页已经存过", detail: ctx.pageTitle ?? "",
                                                            style: .success, actions: [
-                                                    .init(title: "打开") { CaptureModel.open(note: target, vault: vault) },
+                                                    .init(title: "补充想法") { self?.show(amend: page) },
+                                                ], duration: 4)
+                                            } else if let heading = CaptureFormatter.sectionHeading(from: g.text) {
+                                                // Selected text of a recorded page: an H2 section under its entry.
+                                                try w.amend(page, text: heading, attachments: [])
+                                                Toast.show("已补充到「\(ctx.pageTitle ?? "")」", detail: target.file.deletingPathExtension().lastPathComponent,
+                                                           style: .success, actions: [
+                                                    .init(title: "撤销") { self?.undoLast() },
                                                 ], duration: 4)
                                             } else {
-                                                delivered(note: try w.append(content: result.markdown, attachments: result.files, ocr: ocr,
-                                                                             source: result.source, asTask: recipe?.asTask ?? false, to: target))
+                                                // Files and everything else join the page's section as embeds.
+                                                defer { for d in result.tempDirs { try? FileManager.default.removeItem(at: d) } }
+                                                try w.amend(page, text: "", attachments: result.files, ocr: ocr)
+                                                Toast.show("已补充到「\(ctx.pageTitle ?? "")」", detail: target.file.deletingPathExtension().lastPathComponent,
+                                                           style: .success, actions: [
+                                                    .init(title: "撤销") { self?.undoLast() },
+                                                ], duration: 4)
                                             }
                                         } else {
                                             delivered(note: try dailyAppend())
@@ -471,9 +492,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                     detail = shot.url.lastPathComponent
                 } else if ctx.kind == .browser, let link = CaptureFormatter.pageLink(ctx), let url = ctx.url,
                           url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "http" {
-                    // Save right away; the description and snapshot tuck in afterwards (see delivered).
+                    // Save right away as an outline heading; the description and snapshot tuck in afterwards (see delivered).
                     pageURL = url
-                    result = .init(markdown: link, files: [], tempDirs: [], source: nil)
+                    result = .init(markdown: "# " + link, files: [], tempDirs: [], source: nil)
                     title = "已收录当前网页"
                 } else if prefs.clipboardFallback, let clip = watcher.clip() {
                     useClip(clip)
@@ -991,11 +1012,18 @@ func selftest() -> Int32 {
     try? "看[链接](https://a.com/x) 的笔记".write(to: oldNote, atomically: true, encoding: .utf8)
     try? "又提到了 https://a.com/x 第二次".write(to: newNote, atomically: true, encoding: .utf8)
     try? FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -3600)], ofItemAtPath: oldNote.path)
-    check("merge: latest containing file wins", MergeTarget.pick(paths: ["旧.md", "新.md"], url: "https://a.com/x", in: mv)?.lastPathComponent ?? "", "新.md")
+    check("merge: latest containing file wins", MergeTarget.pick(paths: ["旧.md", "新.md"], url: "https://a.com/x", in: mv)?.file.lastPathComponent ?? "", "新.md")
     try? "没有这个网址".write(to: newNote, atomically: true, encoding: .utf8)
-    check("merge: files without the url are ignored", MergeTarget.pick(paths: ["旧.md", "新.md"], url: "https://a.com/x", in: mv)?.lastPathComponent ?? "", "旧.md")
+    check("merge: files without the url are ignored", MergeTarget.pick(paths: ["旧.md", "新.md"], url: "https://a.com/x", in: mv)?.file.lastPathComponent ?? "", "旧.md")
+    check("merge: the matched line comes back for amend", MergeTarget.pick(paths: ["旧.md", "新.md"], url: "https://a.com/x", in: mv)?.entry ?? "", "看[链接](https://a.com/x) 的笔记")
     check("merge: no candidates", String(MergeTarget.pick(paths: [], url: "https://a.com/x", in: mv) == nil), "true")
     try? FileManager.default.removeItem(at: mv)
+
+    // Selected text of a recorded page becomes a capped one-line H2 under its entry.
+    check("heading: collapse + H2", CaptureFormatter.sectionHeading(from: "  a\n\nb  ") ?? "", "## a b")
+    check("heading: marks stripped", CaptureFormatter.sectionHeading(from: "### 标题 ##") ?? "", "## 标题")
+    check("heading: capped", String(CaptureFormatter.sectionHeading(from: String(repeating: "字", count: 200))?.count ?? 0), "124")
+    check("heading: whitespace only is nil", String(CaptureFormatter.sectionHeading(from: "   ") == nil), "true")
 
     print(failures == 0 ? "ALL PASS" : "\(failures) FAILED")
     return failures == 0 ? 0 : 1
