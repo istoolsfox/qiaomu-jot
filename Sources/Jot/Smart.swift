@@ -88,29 +88,23 @@ enum LinkTitle {
         return out + ns.substring(from: last)
     }
 
-    /// Title + description from one request, so a saved link stays recognizable later.
-    struct PageMeta {
-        var title: String?
-        var description: String?
-    }
-
-    /// Same fetch as `fetch`, also returning the page description. `timeout` stays short: the
-    /// description is a nice-to-have, the capture must not wait on slow servers.
-    static func meta(_ url: URL, timeout: TimeInterval = 3, completion: @escaping (PageMeta?) -> Void) {
+    /// The page's own description from one request. `timeout` stays short: the description is
+    /// a nice-to-have, the capture must not wait on slow servers.
+    static func description(_ url: URL, timeout: TimeInterval = 3, completion: @escaping (String?) -> Void) {
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
                      forHTTPHeaderField: "User-Agent")
         URLSession.shared.dataTask(with: req) { data, resp, _ in
-            var meta: PageMeta?
+            var text: String?
             if let data, let http = resp as? HTTPURLResponse, (200..<400).contains(http.statusCode),
                (http.mimeType ?? "text/html").contains("html") {
                 let head = data.prefix(400_000)
                 let gb = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(
                     CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))
                 let html = String(data: head, encoding: .utf8) ?? String(data: head, encoding: gb) ?? ""
-                if !html.isEmpty { meta = PageMeta(title: parse(html), description: parseDescription(html)) }
+                if !html.isEmpty { text = parseDescription(html) }
             }
-            DispatchQueue.main.async { completion(meta) }
+            DispatchQueue.main.async { completion(text) }
         }.resume()
     }
 

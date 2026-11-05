@@ -369,8 +369,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                 let group = DispatchGroup()
                                 if wantDesc {
                                     group.enter()
-                                    LinkTitle.meta(page, timeout: 3) { meta in
-                                        if let d = meta?.description { text = "\n> " + d }
+                                    LinkTitle.description(page, timeout: 3) { d in
+                                        if let d { text = "\n> " + d }
                                         group.leave()
                                     }
                                 }
