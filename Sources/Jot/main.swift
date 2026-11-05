@@ -367,9 +367,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                 LinkTitle.description(page, timeout: 3) { d in
                                     guard let d, let current = History.last,
                                           current.note == entry.note, current.entry.hasPrefix(entry.entry) else { return }
-                                    if (try? w.amend(current, text: "\n> " + d, attachments: [])) != nil {
-                                        Toast.show("已补上页面描述", style: .success)
-                                    }
+                                    try? w.amend(current, text: "\n> " + d, attachments: [])
                                 }
                             }
                             if prefs.pageSnapshot {
