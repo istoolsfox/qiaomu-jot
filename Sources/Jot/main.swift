@@ -416,8 +416,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                                         if let target = MergeTarget.pick(paths: paths, url: url.absoluteString, in: vault) {
                                             // Never file the link twice: thoughts, selections and files join its section.
                                             let page = History.Entry(note: target.file, entry: target.entry, files: [], indent: "")
-                                            let bare = pageURL != nil
-                                            self?.supplementPage(page, text: bare ? "" : g.text, files: bare ? [] : result.files,
+                                            self?.supplementPage(page, text: g.text, files: result.files,
                                                                  tempDirs: result.tempDirs, ocr: ocr, pageTitle: ctx.pageTitle, writer: w)
                                         } else {
                                             delivered(note: try dailyAppend())
